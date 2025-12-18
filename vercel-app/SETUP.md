@@ -8,19 +8,29 @@ When you edit your Google Sheet (or when new form responses are added), a script
 
 ## Step-by-Step Setup
 
-### Step 1: Deploy Your Vercel App
+### Step 1: Set Up Vercel KV (Redis)
+
+1. Go to your Vercel dashboard → Select your project
+2. Click on the **Storage** tab
+3. Click **Create Database** → Select **KV (Redis)**
+4. Name your database (e.g., "form-checker-storage")
+5. Select your region and click **Create**
+6. Vercel will automatically add the environment variables to your project
+7. Redeploy your app to apply the changes (push a commit or trigger a redeploy)
+
+### Step 2: Deploy Your Vercel App
 
 1. Make sure your app is deployed to Vercel
 2. Get your app URL (e.g., `https://your-app.vercel.app`)
-3. Keep this URL handy - you'll need it in Step 3
+3. Keep this URL handy - you'll need it in Step 4
 
-### Step 2: Open Google Apps Script
+### Step 3: Open Google Apps Script
 
 1. Open your Google Sheet (the one connected to your Google Form)
 2. Click **Extensions** → **Apps Script**
 3. You'll see a new browser tab with the Apps Script editor
 
-### Step 3: Add the Webhook Script
+### Step 4: Add the Webhook Script
 
 1. In the Apps Script editor, **delete any existing code**
 2. Open the file [`google-apps-script.js`](google-apps-script.js) from this project
@@ -36,13 +46,13 @@ When you edit your Google Sheet (or when new form responses are added), a script
    ```
    ⚠️ **Important:** No trailing slash!
 
-### Step 4: Save and Name Your Project
+### Step 5: Save and Name Your Project
 
 1. Click the **floppy disk icon** (💾) or press `Ctrl+S` to save
 2. Give your project a name (e.g., "Form Grader Auto-Sync")
 3. Click **OK**
 
-### Step 5: Run the Setup Function
+### Step 6: Run the Setup Function
 
 1. In the Apps Script editor, find the function dropdown (shows "Select function")
 2. Select **`setup`** from the dropdown
@@ -56,7 +66,7 @@ When you edit your Google Sheet (or when new form responses are added), a script
 5. Wait for the script to finish (you'll see "Execution completed" at the bottom)
 6. Check the **Execution log** - you should see success messages
 
-### Step 6: Test the Connection
+### Step 7: Test the Connection
 
 1. In the Apps Script editor, select **`testWebhook`** from the function dropdown
 2. Click **Run** (▶️)
@@ -94,7 +104,7 @@ Google Apps Script Trigger
     ↓
 Your Vercel App Webhook (/api/webhook)
     ↓
-  (stores in memory)
+  (stores in Vercel KV Redis)
     ↓
 Frontend loads data when you click the button
 ```
@@ -106,10 +116,12 @@ Frontend loads data when you click the button
 **Problem:** App says "No data available yet. Please update your Google Sheet..."
 
 **Solutions:**
-1. Make sure you ran the `setup` function in Apps Script
-2. Try running `testWebhook` manually in Apps Script
-3. Check the Apps Script execution log for errors
-4. Make sure `VERCEL_APP_URL` is correct (no trailing slash!)
+1. Make sure you set up Vercel KV storage (Step 1)
+2. Verify the app was redeployed after adding Vercel KV
+3. Make sure you ran the `setup` function in Apps Script
+4. Try running `testWebhook` manually in Apps Script
+5. Check the Apps Script execution log for errors
+6. Make sure `VERCEL_APP_URL` is correct (no trailing slash!)
 
 ### Data Not Updating
 
@@ -172,9 +184,10 @@ To re-enable, just run `setup` again.
 
 ### Data Storage
 
-- Data is stored **in memory** on your Vercel server
-- When Vercel restarts your app, the data persists during the session
-- For production use with high traffic, consider using a database (Redis, Vercel KV, etc.)
+- Data is stored in **Vercel KV (Redis)**
+- Data persists across server restarts and serverless function cold starts
+- Data is shared across all users and browsers
+- Perfect for production use
 
 ### Rate Limits
 
@@ -188,16 +201,19 @@ To re-enable, just run `setup` again.
 - For production, consider adding authentication (API key, secret token, etc.)
 - The current setup is fine for testing and low-security use cases
 
-### Vercel Serverless Functions
+### Vercel Serverless Functions & KV Storage
 
 - The webhook runs as a Vercel serverless function
-- Data persists in memory during the function's lifecycle
-- For long-term storage, integrate a database
+- Data is stored in Vercel KV (Redis) for persistent storage
+- Data survives serverless function cold starts and restarts
+- Free tier includes 256MB storage and 100K operations/month
 
 ## Testing Your Setup
 
 ### Quick Test Checklist
 
+- [ ] Created Vercel KV database in Vercel dashboard
+- [ ] Redeployed app after adding Vercel KV
 - [ ] Deployed Vercel app and got the URL
 - [ ] Opened Google Sheet → Extensions → Apps Script
 - [ ] Pasted the script code
