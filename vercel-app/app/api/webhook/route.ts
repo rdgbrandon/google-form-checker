@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { Redis } from '@upstash/redis'
+import Redis from 'ioredis'
 
 // KV store keys
 const SHEETS_INDEX_KEY = 'sheets:index' // List of all sheet names
@@ -12,16 +12,21 @@ interface SheetData {
 }
 
 // Get Redis client (lazy initialization to avoid build-time issues)
+let redisClient: Redis | null = null
+
 function getRedisClient() {
   if (!process.env.REDIS_URL) {
     throw new Error('REDIS_URL environment variable is not set')
   }
 
-  const redisUrl = new URL(process.env.REDIS_URL)
-  return new Redis({
-    url: process.env.REDIS_URL,
-    token: redisUrl.password || '',
-  })
+  // Reuse existing connection
+  if (redisClient) {
+    return redisClient
+  }
+
+  // Create new Redis client from connection string
+  redisClient = new Redis(process.env.REDIS_URL)
+  return redisClient
 }
 
 export async function POST(request: NextRequest) {
@@ -59,13 +64,14 @@ export async function POST(request: NextRequest) {
       timestamp: Date.now()
     }
 
-    const kv = getRedisClient()
-    await kv.set(getSheetKey(sheetName), sheetData)
+    const redis = getRedisClient()
+    await redis.set(getSheetKey(sheetName), JSON.stringify(sheetData))
 
     // Update the sheets index
-    const existingSheets = await kv.get<string[]>(SHEETS_INDEX_KEY) || []
+    const existingSheetsJson = await redis.get(SHEETS_INDEX_KEY)
+    const existingSheets: string[] = existingSheetsJson ? JSON.parse(existingSheetsJson) : []
     if (!existingSheets.includes(sheetName)) {
-      await kv.set(SHEETS_INDEX_KEY, [...existingSheets, sheetName])
+      await redis.set(SHEETS_INDEX_KEY, JSON.stringify([...existingSheets, sheetName]))
     }
 
     console.log(`Webhook received for "${sheetName}": ${dataRows.length} rows updated at ${new Date().toISOString()}`)
@@ -88,20 +94,22 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const kv = getRedisClient()
+    const redis = getRedisClient()
     const { searchParams } = new URL(request.url)
     const sheetName = searchParams.get('sheet')
 
     // If sheet name provided, return that specific sheet
     if (sheetName) {
-      const sheetData = await kv.get<SheetData>(getSheetKey(sheetName))
+      const sheetDataJson = await redis.get(getSheetKey(sheetName))
 
-      if (!sheetData) {
+      if (!sheetDataJson) {
         return NextResponse.json(
           { error: `Sheet "${sheetName}" not found. Please update your Google Sheet to trigger the webhook.` },
           { status: 404 }
         )
       }
+
+      const sheetData: SheetData = JSON.parse(sheetDataJson)
 
       const hoursSinceUpdate = (Date.now() - sheetData.timestamp) / (1000 * 60 * 60)
 
@@ -116,9 +124,18 @@ export async function GET(request: NextRequest) {
     }
 
     // No sheet name provided - return list of available sheets or the most recent
-    const sheetNames = await kv.get<string[]>(SHEETS_INDEX_KEY)
+    const sheetNamesJson = await redis.get(SHEETS_INDEX_KEY)
 
-    if (!sheetNames || sheetNames.length === 0) {
+    if (!sheetNamesJson) {
+      return NextResponse.json(
+        { error: 'No data available yet. Please update your Google Sheet to trigger the webhook.' },
+        { status: 404 }
+      )
+    }
+
+    const sheetNames: string[] = JSON.parse(sheetNamesJson)
+
+    if (sheetNames.length === 0) {
       return NextResponse.json(
         { error: 'No data available yet. Please update your Google Sheet to trigger the webhook.' },
         { status: 404 }
@@ -128,7 +145,8 @@ export async function GET(request: NextRequest) {
     // Get all sheet data
     const sheetsData = await Promise.all(
       sheetNames.map(async (name) => {
-        const data = await kv.get<SheetData>(getSheetKey(name))
+        const dataJson = await redis.get(getSheetKey(name))
+        const data = dataJson ? JSON.parse(dataJson) as SheetData : null
         return { name, data }
       })
     )
