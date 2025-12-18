@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { kv } from '@vercel/kv'
+import { createClient } from '@vercel/kv'
+
+// Create KV client using REDIS_URL environment variable
+const kv = createClient({
+  url: process.env.REDIS_URL!,
+  token: process.env.REDIS_URL!, // For Vercel Redis, the URL contains auth
+})
 
 // KV store keys
 const SHEETS_INDEX_KEY = 'sheets:index' // List of all sheet names
