@@ -687,12 +687,18 @@ export default function Home() {
                     placeholder="Student name"
                     value={newStudentName[groupIndex] || ''}
                     onChange={(e) => setNewStudentName({ ...newStudentName, [groupIndex]: e.target.value })}
-                    onKeyPress={(e) => e.key === 'Enter' && addStudentToGroup(groupIndex)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        addStudentToGroup(groupIndex)
+                      }
+                    }}
                     className="flex-1 p-2 border border-gray-300 rounded text-sm"
                   />
                   <button
                     onClick={() => addStudentToGroup(groupIndex)}
                     className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600"
+                    type="button"
                   >
                     Add
                   </button>
