@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 
 interface Group {
   name: string
@@ -24,9 +24,7 @@ interface ProcessedResults {
 export default function Home() {
   const [csvData, setCsvData] = useState<any[]>([])
   const [csvHeaders, setCsvHeaders] = useState<string[]>([])
-  const [groups, setGroups] = useState<Group[]>([
-    { name: 'Group 1', students: [] },
-  ])
+  const [groups, setGroups] = useState<Group[]>([])
   const [results, setResults] = useState<ProcessedResults | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -38,6 +36,28 @@ export default function Home() {
   const [availableSheets, setAvailableSheets] = useState<any[]>([])
   const [selectedSheet, setSelectedSheet] = useState<string>('')
   const [currentSheetName, setCurrentSheetName] = useState<string>('')
+
+  // Load groups from localStorage on component mount
+  useEffect(() => {
+    const savedGroups = localStorage.getItem('examGraderGroups')
+    if (savedGroups) {
+      try {
+        setGroups(JSON.parse(savedGroups))
+      } catch (e) {
+        console.error('Failed to load saved groups:', e)
+        setGroups([{ name: 'Group 1', students: [] }])
+      }
+    } else {
+      setGroups([{ name: 'Group 1', students: [] }])
+    }
+  }, [])
+
+  // Save groups to localStorage whenever they change
+  useEffect(() => {
+    if (groups.length > 0) {
+      localStorage.setItem('examGraderGroups', JSON.stringify(groups))
+    }
+  }, [groups])
 
   const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -604,9 +624,18 @@ export default function Home() {
 
         {/* Group Management Section */}
         <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4 text-gray-700">
-            {detectedPrograms.length > 1 ? '3' : '2'}. Manage Groups
-          </h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-gray-700">
+              {detectedPrograms.length > 1 ? '3' : '2'}. Manage Groups
+            </h2>
+            <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full">
+              Auto-saved
+            </span>
+          </div>
+
+          <p className="text-sm text-gray-600 mb-4">
+            Groups are automatically saved and will persist for all users of this app.
+          </p>
 
           <div className="flex gap-2 mb-4">
             <button
@@ -620,6 +649,17 @@ export default function Home() {
               className="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600"
             >
               Add Private Session
+            </button>
+            <button
+              onClick={() => {
+                if (confirm('Are you sure you want to clear all groups? This cannot be undone.')) {
+                  setGroups([{ name: 'Group 1', students: [] }])
+                  localStorage.removeItem('examGraderGroups')
+                }
+              }}
+              className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 ml-auto"
+            >
+              Clear All Groups
             </button>
           </div>
 
