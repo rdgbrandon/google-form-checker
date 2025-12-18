@@ -33,6 +33,8 @@ export default function Home() {
   const [newStudentName, setNewStudentName] = useState<{ [key: number]: string }>({})
   const [selectedProgram, setSelectedProgram] = useState<string>('all')
   const [detectedPrograms, setDetectedPrograms] = useState<string[]>([])
+  const [isLoadingWebhook, setIsLoadingWebhook] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null)
 
   const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -102,6 +104,36 @@ export default function Home() {
 
     reader.readAsText(file)
   }, [])
+
+  const loadFromWebhook = async () => {
+    setIsLoadingWebhook(true)
+    setError(null)
+
+    try {
+      const response = await fetch('/api/webhook')
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to fetch data from webhook')
+      }
+
+      const { headers, data, lastUpdated: timestamp } = await response.json()
+
+      setCsvHeaders(headers)
+      setCsvData(data)
+      setLastUpdated(timestamp)
+
+      // Detect programs based on timestamps
+      const programs = detectPrograms(data, headers)
+      setDetectedPrograms(programs)
+
+      setResults(null)
+    } catch (err: any) {
+      setError(err.message || 'Failed to load data from webhook')
+    } finally {
+      setIsLoadingWebhook(false)
+    }
+  }
 
   const detectPrograms = (data: any[], headers: string[]): string[] => {
     const timestampField = headers.find(h =>
@@ -461,18 +493,54 @@ export default function Home() {
           </div>
         )}
 
-        {/* CSV Upload Section */}
+        {/* Data Source Section */}
         <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4 text-gray-700">1. Upload CSV File</h2>
-          <input
-            type="file"
-            accept=".csv"
-            onChange={handleFileUpload}
-            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-          />
+          <h2 className="text-xl font-semibold mb-4 text-gray-700">1. Load Data</h2>
+
+          {/* Google Sheets Webhook Option */}
+          <div className="mb-6 p-4 border border-blue-200 rounded bg-blue-50">
+            <h3 className="font-semibold mb-2 text-gray-700">Option A: Google Sheets (Auto-Sync)</h3>
+            <p className="text-sm text-gray-600 mb-3">
+              Set up the Google Apps Script webhook (see instructions below), then click to load the latest data
+            </p>
+            <button
+              onClick={loadFromWebhook}
+              disabled={isLoadingWebhook}
+              className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed w-full"
+            >
+              {isLoadingWebhook ? 'Loading...' : 'Load Latest Data from Google Sheets'}
+            </button>
+            {lastUpdated && (
+              <p className="text-xs text-gray-500 mt-2">
+                Last updated: {new Date(lastUpdated).toLocaleString()}
+              </p>
+            )}
+            <details className="mt-3 text-xs text-gray-600">
+              <summary className="cursor-pointer font-semibold hover:text-gray-800">
+                📋 How does this work?
+              </summary>
+              <p className="mt-2 ml-2">
+                When you edit your Google Sheet, a script automatically sends the updated data to this app.
+                Click the button above to load the most recent data. See SETUP.md for configuration instructions.
+              </p>
+            </details>
+          </div>
+
+          {/* CSV Upload Option */}
+          <div className="p-4 border border-gray-200 rounded">
+            <h3 className="font-semibold mb-2 text-gray-700">Option B: Upload CSV File</h3>
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleFileUpload}
+              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+            />
+          </div>
+
           {csvData.length > 0 && (
-            <div className="mt-4 text-sm text-gray-600">
-              <p>Loaded {csvData.length} rows with {csvHeaders.length} columns</p>
+            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded text-sm text-gray-700">
+              <p className="font-semibold">Data loaded successfully!</p>
+              <p>Rows: {csvData.length} | Columns: {csvHeaders.length}</p>
               {detectedPrograms.length > 0 && (
                 <p>Detected programs: {detectedPrograms.join(', ')}</p>
               )}
