@@ -35,6 +35,9 @@ export default function Home() {
   const [detectedPrograms, setDetectedPrograms] = useState<string[]>([])
   const [isLoadingWebhook, setIsLoadingWebhook] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
+  const [availableSheets, setAvailableSheets] = useState<any[]>([])
+  const [selectedSheet, setSelectedSheet] = useState<string>('')
+  const [currentSheetName, setCurrentSheetName] = useState<string>('')
 
   const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -105,23 +108,29 @@ export default function Home() {
     reader.readAsText(file)
   }, [])
 
-  const loadFromWebhook = async () => {
+  const loadFromWebhook = async (sheetName?: string) => {
     setIsLoadingWebhook(true)
     setError(null)
 
     try {
-      const response = await fetch('/api/webhook')
+      const url = sheetName ? `/api/webhook?sheet=${encodeURIComponent(sheetName)}` : '/api/webhook'
+      const response = await fetch(url)
 
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(errorData.error || 'Failed to fetch data from webhook')
       }
 
-      const { headers, data, lastUpdated: timestamp } = await response.json()
+      const { headers, data, lastUpdated: timestamp, sheetName: returnedSheetName, availableSheets } = await response.json()
 
       setCsvHeaders(headers)
       setCsvData(data)
       setLastUpdated(timestamp)
+      setCurrentSheetName(returnedSheetName || '')
+
+      if (availableSheets) {
+        setAvailableSheets(availableSheets)
+      }
 
       // Detect programs based on timestamps
       const programs = detectPrograms(data, headers)
@@ -133,6 +142,14 @@ export default function Home() {
     } finally {
       setIsLoadingWebhook(false)
     }
+  }
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      // Could add a toast notification here if desired
+    }).catch(err => {
+      console.error('Failed to copy:', err)
+    })
   }
 
   const detectPrograms = (data: any[], headers: string[]): string[] => {
@@ -463,9 +480,9 @@ export default function Home() {
       output += `--- ${group} (${students.length} students) ---\n`
       students.forEach(s => {
         if (s.missed.length === 0) {
-          output += `  ${s.name}: All correct! (${s.score})\n`
+          output += `  ${s.name}: All correct!\n`
         } else {
-          output += `  ${s.name}: Missed Q${s.missed.join(', Q')} (${s.score})\n`
+          output += `  ${s.name}: ${s.missed.join(', ')}\n`
         }
       })
       output += '\n'
@@ -503,8 +520,27 @@ export default function Home() {
             <p className="text-sm text-gray-600 mb-3">
               Set up the Google Apps Script webhook (see instructions below), then click to load the latest data
             </p>
+
+            {availableSheets.length > 1 && (
+              <div className="mb-3">
+                <label className="text-xs font-semibold text-gray-600 block mb-1">Select Sheet:</label>
+                <select
+                  value={selectedSheet}
+                  onChange={(e) => setSelectedSheet(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded text-sm"
+                >
+                  <option value="">Most Recent</option>
+                  {availableSheets.map((sheet, i) => (
+                    <option key={i} value={sheet.name}>
+                      {sheet.name} ({sheet.rowCount} rows)
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <button
-              onClick={loadFromWebhook}
+              onClick={() => loadFromWebhook(selectedSheet || undefined)}
               disabled={isLoadingWebhook}
               className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed w-full"
             >
@@ -512,6 +548,7 @@ export default function Home() {
             </button>
             {lastUpdated && (
               <p className="text-xs text-gray-500 mt-2">
+                {currentSheetName && <span className="font-semibold">{currentSheetName} - </span>}
                 Last updated: {new Date(lastUpdated).toLocaleString()}
               </p>
             )}
@@ -688,17 +725,30 @@ export default function Home() {
                     {group} ({students.length} students)
                   </h3>
                   <div className="space-y-1">
-                    {students.map((student, i) => (
-                      <div key={i} className="text-sm flex justify-between items-center py-1">
-                        <span className="font-medium">{student.name}</span>
-                        <span className={student.missed.length === 0 ? 'text-green-600' : 'text-red-600'}>
-                          {student.missed.length === 0
-                            ? `All correct! (${student.score})`
-                            : `Missed: Q${student.missed.join(', Q')} (${student.score})`
-                          }
-                        </span>
-                      </div>
-                    ))}
+                    {students.map((student, i) => {
+                      const resultText = student.missed.length === 0
+                        ? `${student.name}: All correct!`
+                        : `${student.name}: ${student.missed.join(', ')}`
+
+                      return (
+                        <div key={i} className="text-sm flex justify-between items-center py-1 gap-2 group">
+                          <span className="font-medium flex-shrink-0">{student.name}:</span>
+                          <span className={`flex-1 ${student.missed.length === 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {student.missed.length === 0
+                              ? `All correct!`
+                              : student.missed.join(', ')
+                            }
+                          </span>
+                          <button
+                            onClick={() => copyToClipboard(resultText)}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-1 rounded text-xs flex-shrink-0"
+                            title="Copy to clipboard"
+                          >
+                            Copy
+                          </button>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               ))
