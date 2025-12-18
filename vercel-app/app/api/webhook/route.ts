@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@vercel/kv'
+import { Redis } from '@upstash/redis'
 
-// Create KV client using REDIS_URL environment variable
-const kv = createClient({
+// Create Redis client using REDIS_URL environment variable
+// Parse the URL to extract host, port, and password
+const redisUrl = new URL(process.env.REDIS_URL!)
+const kv = new Redis({
   url: process.env.REDIS_URL!,
-  token: process.env.REDIS_URL!, // For Vercel Redis, the URL contains auth
+  token: redisUrl.password || '',
 })
 
 // KV store keys
