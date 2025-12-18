@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Redis } from '@upstash/redis'
 
-// Create Redis client using REDIS_URL environment variable
-// Parse the URL to extract host, port, and password
-const redisUrl = new URL(process.env.REDIS_URL!)
-const kv = new Redis({
-  url: process.env.REDIS_URL!,
-  token: redisUrl.password || '',
-})
-
 // KV store keys
 const SHEETS_INDEX_KEY = 'sheets:index' // List of all sheet names
 const getSheetKey = (name: string) => `sheet:${name}` // Individual sheet data
@@ -17,6 +9,19 @@ interface SheetData {
   headers: string[]
   data: any[]
   timestamp: number
+}
+
+// Get Redis client (lazy initialization to avoid build-time issues)
+function getRedisClient() {
+  if (!process.env.REDIS_URL) {
+    throw new Error('REDIS_URL environment variable is not set')
+  }
+
+  const redisUrl = new URL(process.env.REDIS_URL)
+  return new Redis({
+    url: process.env.REDIS_URL,
+    token: redisUrl.password || '',
+  })
 }
 
 export async function POST(request: NextRequest) {
@@ -54,6 +59,7 @@ export async function POST(request: NextRequest) {
       timestamp: Date.now()
     }
 
+    const kv = getRedisClient()
     await kv.set(getSheetKey(sheetName), sheetData)
 
     // Update the sheets index
@@ -82,6 +88,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+    const kv = getRedisClient()
     const { searchParams } = new URL(request.url)
     const sheetName = searchParams.get('sheet')
 
