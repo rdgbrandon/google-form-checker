@@ -37,26 +37,44 @@ export default function Home() {
   const [selectedSheet, setSelectedSheet] = useState<string>('')
   const [currentSheetName, setCurrentSheetName] = useState<string>('')
 
-  // Load groups from localStorage on component mount
+  // Load groups from server on component mount
   useEffect(() => {
-    const savedGroups = localStorage.getItem('examGraderGroups')
-    if (savedGroups) {
+    const loadGroups = async () => {
       try {
-        setGroups(JSON.parse(savedGroups))
+        const response = await fetch('/api/groups')
+        if (response.ok) {
+          const data = await response.json()
+          setGroups(data.groups)
+        } else {
+          setGroups([{ name: 'Group 1', students: [] }])
+        }
       } catch (e) {
-        console.error('Failed to load saved groups:', e)
+        console.error('Failed to load groups:', e)
         setGroups([{ name: 'Group 1', students: [] }])
       }
-    } else {
-      setGroups([{ name: 'Group 1', students: [] }])
     }
+    loadGroups()
   }, [])
 
-  // Save groups to localStorage whenever they change
+  // Save groups to server whenever they change
   useEffect(() => {
-    if (groups.length > 0) {
-      localStorage.setItem('examGraderGroups', JSON.stringify(groups))
+    const saveGroups = async () => {
+      if (groups.length > 0) {
+        try {
+          await fetch('/api/groups', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ groups })
+          })
+        } catch (e) {
+          console.error('Failed to save groups:', e)
+        }
+      }
     }
+
+    // Debounce saves to avoid too many requests
+    const timeoutId = setTimeout(saveGroups, 500)
+    return () => clearTimeout(timeoutId)
   }, [groups])
 
   const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
@@ -634,7 +652,7 @@ export default function Home() {
           </div>
 
           <p className="text-sm text-gray-600 mb-4">
-            Groups are automatically saved and will persist for all users of this app.
+            Groups are automatically saved to the server and shared across all browsers and devices.
           </p>
 
           <div className="flex gap-2 mb-4">

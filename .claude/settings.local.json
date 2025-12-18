@@ -11,7 +11,9 @@
       "Bash(git add:*)",
       "Bash(vercel:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd Google Sheets webhook integration\n\n- Replace Google Sheets API with webhook approach\n- Add webhook endpoint at /api/webhook\n- Create Google Apps Script for auto-sync\n- Update UI with webhook loading button\n- Add comprehensive setup documentation\n- Remove googleapis dependency\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd multi-sheet support and improve results display\n\n- Support multiple Google Sheets via webhook\n- Add sheet selector when multiple sheets available\n- Remove ''Q'' prefix from missed question numbers\n- Add copy button for each student result\n- Update export format to match new display\n- Store sheets by name in webhook endpoint\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
